@@ -1,41 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Bird Species Identifier</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      background: #f0f4f8;
-      padding-top: 60px;
-    }
-    .container {
-      max-width: 600px;
-      background: white;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .img-preview {
-      max-width: 100%;
-      height: auto;
-      margin-top: 20px;
-    }
-  </style>
+    <title>Bird Species Classifier</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 30px; }
+        h1 { color: green; }
+        input { margin-top: 15px; }
+    </style>
 </head>
 <body>
-<div class="container text-center">
-  <h2 class="mb-4">Bird Species Classifier</h2>
-  <form action="/predict" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" class="form-control mb-3" required>
-    <button type="submit" class="btn btn-primary">Upload & Predict</button>
-  </form>
-
-  {% if prediction %}
-    <h4 class="mt-4">Prediction:</h4>
-    <p class="text-success fs-5">{{ prediction }}</p>
-    <img src="{{ url_for('static', filename='uploads/' + filename) }}" class="img-preview mt-3">
-  {% endif %}
-</div>
+    <h1>Bird Species Classifier</h1>
+    <form action="/predict" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" required>
+        <br><br>
+        <input type="submit" value="Classify Image">
+    </form>
 </body>
 </html>
