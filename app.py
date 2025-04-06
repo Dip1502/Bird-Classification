@@ -1,73 +1,81 @@
-import os
+from flask import Flask, request, render_template, jsonify, send_from_directory
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import numpy as np
-import tensorflow as tf
-from flask import Flask, request, render_template, redirect, url_for
-from werkzeug.utils import secure_filename
 from PIL import Image
+import os
+import uuid
 
-# Suppress TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.get_logger().setLevel('ERROR')
-
-# Initialize Flask app
 app = Flask(__name__)
+
+# Set folder to temporarily store uploaded images
 UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Load the trained MobileNetV2 model
-model = tf.keras.models.load_model("bird_classification_model_1.h5")
+# Load your trained model
+MODEL_PATH = 'model/bird_classification_model_1.h5'
+model = load_model(MODEL_PATH)
 
-# Define class names (in the same order used during training)
-class_names = ['ABBOTTS BABBLER', 'ABBOTTS BOOBY', 'ABYSSINIAN GROUND HORNBILL',
-               'AFRICAN CROWNED CRANE', 'AFRICAN EMERALD CUCKOO', 'AFRICAN FIREFINCH',
-               'AFRICAN OYSTER CATCHER', 'AFRICAN PIED HORNBILL', 'AFRICAN PYGMY GOOSE',
-               'ALBATROSS', 'ALBERTS TOWHEE', 'ALEXANDRINE PARAKEET', 'ALPINE CHOUGH',
-               'ALTAMIRA YELLOWTHROAT', 'AMERICAN AVOCET', 'AMERICAN BITTERN',
-               'AMERICAN COOT', 'AMERICAN FLAMINGO', 'AMERICAN GOLDFINCH',
-               'AMERICAN KESTREL']
+# Your 20 bird species
+class_names = [
+    'ABBOTTS BABBLER', 'ABBOTTS BOOBY', 'ABYSSINIAN GROUND HORNBILL',
+    'AFRICAN CROWNED CRANE', 'AFRICAN EMERALD CUCKOO', 'AFRICAN FIREFINCH',
+    'AFRICAN OYSTER CATCHER', 'AFRICAN PIED HORNBILL', 'AFRICAN PYGMY GOOSE',
+    'ALBATROSS', 'ALBERTS TOWHEE', 'ALEXANDRINE PARAKEET', 'ALPINE CHOUGH',
+    'ALTAMIRA YELLOWTHROAT', 'AMERICAN AVOCET', 'AMERICAN BITTERN',
+    'AMERICAN COOT', 'AMERICAN FLAMINGO', 'AMERICAN GOLDFINCH',
+    'AMERICAN KESTREL'
+]
 
-# Prediction threshold
-CONFIDENCE_THRESHOLD = 0.9
-
-# Route: Home
-@app.route('/')
+@app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
-# Route: Prediction
 @app.route('/predict', methods=['POST'])
 def predict():
     if 'file' not in request.files:
-        return redirect(request.url)
+        return render_template('index.html', message='No file uploaded.')
 
     file = request.files['file']
     if file.filename == '':
-        return redirect(request.url)
+        return render_template('index.html', message='No image selected.')
 
-    if file:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
+    try:
+        # Save uploaded image
+        filename = f"{uuid.uuid4().hex}.jpg"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-        # Load and preprocess the image
-        img = Image.open(file_path).resize((224, 224))
-        img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
+        # Preprocess the image
+        image = Image.open(filepath).convert('RGB')
+        image = image.resize((256, 256))
+        image_array = np.array(image)
+        image_array = preprocess_input(image_array)
+        image_array = np.expand_dims(image_array, axis=0)
 
-        # Predict
-        predictions = model.predict(img_array)
-        confidence = np.max(predictions)
-        predicted_index = np.argmax(predictions)
+        # Make prediction
+        predictions = model.predict(image_array)
+        predicted_index = np.argmax(predictions[0])
+        confidence = float(np.max(predictions[0]))
 
-        if confidence >= CONFIDENCE_THRESHOLD:
-            predicted_label = class_names[predicted_index]
+        if confidence < 0.9:
+            result = "This species does not belong to the database."
         else:
-            predicted_label = "This species does not belong to the database."
+            result = class_names[predicted_index]
 
-        return render_template('index.html', prediction=predicted_label, filename=filename)
+        image_url = f"/{filepath.replace(os.sep, '/')}"
+        return render_template('index.html', prediction=result, confidence=round(confidence * 100, 2), image_url=image_url)
 
-    return redirect(url_for('index'))
+    except Exception as e:
+        return render_template('index.html', message=f"Error: {str(e)}")
 
-# Run app
+# Serve uploaded images
+@app.route('/static/uploads/<filename>')
+def send_uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 if __name__ == '__main__':
-    app.run(debug=True)
-
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
