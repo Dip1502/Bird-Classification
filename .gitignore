@@ -1,0 +1,14 @@
+*.pyc
+__pycache__
+*.pyo
+# Virtual environment
+.venv/
+env/
+venv/
+
+*.h5
+*.docx
+*.pdf
+*.zip
+Bird*
+
